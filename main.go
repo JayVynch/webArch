@@ -5,7 +5,9 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -13,7 +15,47 @@ type Person struct {
 	First string
 }
 
+type UserClaims struct {
+	jwt.RegisteredClaims
+	SessionID int64
+}
+
+func (u UserClaims) Valid() error {
+	// Check expiration
+	if u.ExpiresAt != nil && time.Now().After(u.ExpiresAt.Time) {
+		return fmt.Errorf("token is expired")
+	}
+	// Check NotBefore
+	if u.NotBefore != nil && time.Now().Before(u.NotBefore.Time) {
+		return fmt.Errorf("token not valid yet")
+	}
+	// Check IssuedAt
+	if u.IssuedAt != nil && time.Now().Before(u.IssuedAt.Time) {
+		return fmt.Errorf("token used before issued")
+	}
+	return nil
+}
+
+var key []byte
+
 func main() {
+	for i := 1; i <= 64; i++ {
+		key = append(key, byte(i))
+	}
+
+	claims := UserClaims{
+		SessionID: 123,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)), // already expired
+		},
+	}
+
+	// Validate using built-in method
+	if err := claims.Valid(); err != nil {
+		fmt.Println("Token invalid:", err)
+	} else {
+		fmt.Println("Token valid")
+	}
 
 	// p1 := Person{
 	// 	First: "James",
@@ -56,8 +98,8 @@ func main() {
 
 	fmt.Println("HashedPassword is:", string(hashedPwd))
 
-	wrongPass := "asdfghjkl"
-	err = comparePassword(wrongPass, hashedPwd)
+	// wrongPass := "asdfghjkl"
+	err = comparePassword(pass, hashedPwd)
 	if err != nil {
 		log.Fatalln("In correct Password")
 	}
@@ -90,12 +132,6 @@ func comparePassword(password string, hashedPassword []byte) error {
 }
 
 func signMsg(msg []byte) ([]byte, error) {
-	var key []byte
-
-	for i := 1; i < 64; i++ {
-		key = append(key, byte(i))
-	}
-
 	h := hmac.New(sha512.New, key)
 
 	_, err := h.Write(msg)
