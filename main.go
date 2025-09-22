@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -38,6 +40,9 @@ func main() {
 	// }
 
 	// fmt.Println("Return to go structure", xp2)
+
+	// basic auth standards
+	fmt.Println(base64.StdEncoding.EncodeToString([]byte("user:pass")))
 
 	// serving a web application with go
 	http.HandleFunc("/encoder", foo)
