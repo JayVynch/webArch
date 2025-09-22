@@ -20,7 +20,7 @@ type UserClaims struct {
 	SessionID int64
 }
 
-func (u UserClaims) Valid() error {
+func (u *UserClaims) Valid() error {
 	// Check expiration
 	if u.ExpiresAt != nil && time.Now().After(u.ExpiresAt.Time) {
 		return fmt.Errorf("token is expired")
@@ -152,6 +152,17 @@ func checkSig(msg, sig []byte) (bool, error) {
 
 	same := hmac.Equal(newSig, sig)
 	return same, nil
+}
+
+func createToken(c *UserClaims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, c)
+	signedToken, err := token.SignedString(key)
+
+	if err != nil {
+		return "", fmt.Errorf("could not sign you in")
+	}
+
+	return signedToken, nil
 }
 
 // func foo(w http.ResponseWriter, r *http.Request) {
