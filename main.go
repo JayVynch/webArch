@@ -159,7 +159,7 @@ func createToken(c *UserClaims) (string, error) {
 	signedToken, err := token.SignedString(key)
 
 	if err != nil {
-		return "", fmt.Errorf("could not sign you in")
+		return "", fmt.Errorf("could not sign you in: %w", err)
 	}
 
 	return signedToken, nil
