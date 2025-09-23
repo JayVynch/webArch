@@ -2,11 +2,14 @@ package main
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha512"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -36,12 +39,7 @@ func (u *UserClaims) Valid() error {
 	return nil
 }
 
-var key []byte
-
 func main() {
-	for i := 1; i <= 64; i++ {
-		key = append(key, byte(i))
-	}
 
 	claims := UserClaims{
 		SessionID: 123,
@@ -154,9 +152,40 @@ func checkSig(msg, sig []byte) (bool, error) {
 	return same, nil
 }
 
+// creating a key struct to hold on to keys
+type Key struct {
+	key       []byte
+	createdAt time.Time
+}
+
+var currentKey = ""
+var keys = map[string]Key{}
+
+func generateNewKey() error {
+	newKey := make([]byte, 64)
+
+	_, err := io.ReadFull(rand.Reader, newKey)
+	if err != nil {
+		return fmt.Errorf("errors while generating new key: %w", err)
+	}
+
+	uid, err := uuid.NewV4()
+	if err != nil {
+		return fmt.Errorf("errors while generating new kid: %w", err)
+	}
+	keys[uid.String()] = Key{
+		key:       newKey,
+		createdAt: time.Now(),
+	}
+
+	currentKey = uid.String()
+
+	return nil
+}
+
 func createToken(c *UserClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, c)
-	signedToken, err := token.SignedString(key)
+	signedToken, err := token.SignedString(keys[currentKey].key)
 
 	if err != nil {
 		return "", fmt.Errorf("could not sign you in: %w", err)
@@ -171,7 +200,19 @@ func parseToken(signedToken string) (*UserClaims, error) {
 			return nil, fmt.Errorf("Invalid signing Algorithm")
 		}
 
-		return key, nil
+		kid, ok := t.Header["kid"].(string)
+
+		if !ok {
+			return nil, fmt.Errorf("Invalid key")
+		}
+
+		k, ok := keys[kid]
+
+		if !ok {
+			return nil, fmt.Errorf("invalid key")
+		}
+
+		return k, nil
 	})
 
 	if err != nil {
